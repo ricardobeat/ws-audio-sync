@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+  </head>
+  <body>
+    <button id="play" disabled>▶︎</button>
+    <button id="pause" disabled>⏸︎</button>
+    <script type="module">
+
+      const play = document.getElementById('play');
+      const pause = document.getElementById('pause');
+
+      const OFFSET = 600;
+      let ws;
+
+      function connect (channelId) {
+        ws = new WebSocket(`http://localhost:3000/ws?channelId=${channelId}`);
+        let localTime = 0;
+        let latency = 0;
+
+        const sync = (fn) => {
+          const delay = Math.max(0, OFFSET - latency);
+          setTimeout(fn, delay)
+        }
+
+        ws.addEventListener('open', () => {
+          ws.send(JSON.stringify({ action: 'ping' }));
+          localTime = Date.now()
+          play.disabled = false;
+          pause.disabled = false;
+        })
+
+        ws.addEventListener('message', (message) => {
+          const data = JSON.parse(message.data);
+
+          if (data.action === "pong") {
+            latency = Date.now() - localTime;
+            console.log(`Latency: ${latency}ms`)
+          }
+
+          if (data.action === 'play') {
+            sync(() => {
+              document.body.style.backgroundColor = 'blue';
+            })
+          }
+
+          if (data.action === 'pause') {
+            sync(() => {
+              document.body.style.backgroundColor = 'white';
+            })
+          }
+        });
+        console.log("joined channel", channelId);
+      }
+      
+      play.addEventListener('click', () => {
+        ws.send(JSON.stringify({ action: 'play' }));
+        // const audio = new Audio('audio.mp3');
+        // audio.play();
+      });
+
+      pause.addEventListener('click', () => {
+        ws.send(JSON.stringify({ action: 'pause' }));
+        // const audio = new Audio('audio.mp3');
+        // audio.pause();
+      });
+
+      const params = new URLSearchParams(window.location.search)
+      const channelId = params.get('channelId');
+
+      if (channelId) {
+        connect(channelId);
+      }  else {
+        alert("No ?channelId provided in the URL");
+      }
+
+    </script>
+  </body>
+</html>
